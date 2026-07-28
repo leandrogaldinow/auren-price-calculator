@@ -15,13 +15,28 @@ import { DEFAULT_CURRENCY } from '@/constants/currencies';
 
 const SETTINGS_KEY = 'auren_currency_settings';
 
+/** Every persisted currency-related preference, kept in one settings object so
+ *  updating one field can never clobber the others in storage. */
 interface CurrencySettings {
   baseCurrency: CurrencyCode;
+  /** Independent display-only override for the "Preço de Venda" headline — doesn't affect calculation. */
+  sellingPriceCurrency: CurrencyCode;
+  isRatePanelExpanded: boolean;
 }
+
+const DEFAULT_SETTINGS: CurrencySettings = {
+  baseCurrency: DEFAULT_CURRENCY,
+  sellingPriceCurrency: DEFAULT_CURRENCY,
+  isRatePanelExpanded: false,
+};
 
 interface CurrencyContextValue {
   baseCurrency: CurrencyCode;
   setBaseCurrency: (currency: CurrencyCode) => void;
+  sellingPriceCurrency: CurrencyCode;
+  setSellingPriceCurrency: (currency: CurrencyCode) => void;
+  isRatePanelExpanded: boolean;
+  setRatePanelExpanded: (expanded: boolean) => void;
   rates: ExchangeRate[];
   lastUpdate: number | null;
   isLoading: boolean;
@@ -33,11 +48,19 @@ interface CurrencyContextValue {
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [baseCurrency, setBaseCurrencyState] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const [settings, setSettings] = useState<CurrencySettings>(DEFAULT_SETTINGS);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const persistSettings = useCallback((partial: Partial<CurrencySettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      void storageSet(SETTINGS_KEY, next);
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async (force: boolean) => {
     setIsLoading(true);
@@ -51,16 +74,26 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    storageGet<CurrencySettings>(SETTINGS_KEY).then((settings) => {
-      if (settings?.baseCurrency) setBaseCurrencyState(settings.baseCurrency);
+    storageGet<CurrencySettings>(SETTINGS_KEY).then((stored) => {
+      if (stored) setSettings((prev) => ({ ...prev, ...stored }));
     });
     void load(false);
   }, [load]);
 
-  const setBaseCurrency = useCallback((currency: CurrencyCode) => {
-    setBaseCurrencyState(currency);
-    void storageSet<CurrencySettings>(SETTINGS_KEY, { baseCurrency: currency });
-  }, []);
+  const setBaseCurrency = useCallback(
+    (currency: CurrencyCode) => persistSettings({ baseCurrency: currency }),
+    [persistSettings],
+  );
+
+  const setSellingPriceCurrency = useCallback(
+    (currency: CurrencyCode) => persistSettings({ sellingPriceCurrency: currency }),
+    [persistSettings],
+  );
+
+  const setRatePanelExpanded = useCallback(
+    (expanded: boolean) => persistSettings({ isRatePanelExpanded: expanded }),
+    [persistSettings],
+  );
 
   const refresh = useCallback(() => load(true), [load]);
 
@@ -70,8 +103,32 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   );
 
   const value: CurrencyContextValue = useMemo(
-    () => ({ baseCurrency, setBaseCurrency, rates, lastUpdate, isLoading, error, refresh, convert }),
-    [baseCurrency, setBaseCurrency, rates, lastUpdate, isLoading, error, refresh, convert],
+    () => ({
+      baseCurrency: settings.baseCurrency,
+      setBaseCurrency,
+      sellingPriceCurrency: settings.sellingPriceCurrency,
+      setSellingPriceCurrency,
+      isRatePanelExpanded: settings.isRatePanelExpanded,
+      setRatePanelExpanded,
+      rates,
+      lastUpdate,
+      isLoading,
+      error,
+      refresh,
+      convert,
+    }),
+    [
+      settings,
+      setBaseCurrency,
+      setSellingPriceCurrency,
+      setRatePanelExpanded,
+      rates,
+      lastUpdate,
+      isLoading,
+      error,
+      refresh,
+      convert,
+    ],
   );
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;

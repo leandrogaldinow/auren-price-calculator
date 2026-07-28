@@ -1,7 +1,8 @@
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Spinner } from '@/components/ui/Spinner';
-import { ResetIcon } from '@/components/icons';
+import { ResetIcon, ChevronDownIcon } from '@/components/icons';
 import { useCurrencyContext } from '@/context/CurrencyContext';
 import { formatDateTime, formatNumber } from '@/utils/format';
 import type { CurrencyCode, ExchangeRate } from '@/types';
@@ -24,19 +25,39 @@ function RateItem({ label, rate }: { label: string; rate: number | undefined }) 
   );
 }
 
-/** Compact, always-visible "Cotação" panel — cache-backed, never fetches on its own. */
+/**
+ * Compact, always-visible "Cotação" panel — starts collapsed (accordion), and
+ * "Atualizar Cotação" lives in the header so refreshing works collapsed too.
+ */
 export function ExchangeRateCard() {
-  const { rates, lastUpdate, isLoading, error, refresh } = useCurrencyContext();
+  const { rates, lastUpdate, isLoading, error, refresh, isRatePanelExpanded, setRatePanelExpanded } =
+    useCurrencyContext();
   const hasRates = rates.length > 0;
 
   return (
     <Card className="animate-fadeIn">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <CardTitle>Cotação</CardTitle>
-        <Button variant="ghost" size="sm" onClick={() => void refresh()} disabled={isLoading}>
-          <ResetIcon width={14} height={14} className={isLoading ? 'animate-spin' : ''} />
-          Atualizar Cotação
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <IconButton
+            label="Atualizar Cotação"
+            icon={<ResetIcon width={14} height={14} className={isLoading ? 'animate-spin' : ''} />}
+            onClick={() => void refresh()}
+            disabled={isLoading}
+          />
+          <IconButton
+            label={isRatePanelExpanded ? 'Recolher Cotação' : 'Expandir Cotação'}
+            aria-expanded={isRatePanelExpanded}
+            icon={
+              <ChevronDownIcon
+                width={14}
+                height={14}
+                className={`transition-transform duration-150 ${isRatePanelExpanded ? 'rotate-180' : ''}`}
+              />
+            }
+            onClick={() => setRatePanelExpanded(!isRatePanelExpanded)}
+          />
+        </div>
       </div>
 
       {!hasRates && isLoading && (
@@ -54,9 +75,9 @@ export function ExchangeRateCard() {
         </div>
       )}
 
-      {hasRates && (
+      {hasRates && isRatePanelExpanded && (
         <>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="mt-2 grid grid-cols-3 gap-2">
             <RateItem label="USD → BRL" rate={findRate(rates, 'USD', 'BRL')} />
             <RateItem label="MXN → BRL" rate={findRate(rates, 'MXN', 'BRL')} />
             <RateItem label="USD → MXN" rate={findRate(rates, 'USD', 'MXN')} />
