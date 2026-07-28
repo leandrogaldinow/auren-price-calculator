@@ -20,5 +20,6 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage"]
+  "permissions": ["storage"],
+  "host_permissions": ["https://economia.awesomeapi.com.br/*"]
 }

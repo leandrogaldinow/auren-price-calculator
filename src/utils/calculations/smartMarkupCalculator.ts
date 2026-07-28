@@ -1,5 +1,11 @@
 import type { ProfileFees, SmartMarkupInputs, SmartMarkupResults, SmartMarkupScenario } from '@/types';
 
+/** Numeric inputs only, already converted to the base currency by the caller. */
+export type SmartMarkupCalculationInputs = Pick<
+  SmartMarkupInputs,
+  'productCost' | 'shipping' | 'desiredProfit' | 'desiredMarginPercent'
+>;
+
 /** Sum of every percentage-of-price fee on the active profile, as a 0–1 fraction. */
 function feesFraction(fees: ProfileFees): number {
   return (
@@ -36,7 +42,7 @@ function buildScenario(
  * fee percentages — to find the selling price that hits it exactly.
  */
 export function calculateSmartMarkup(
-  inputs: SmartMarkupInputs,
+  inputs: SmartMarkupCalculationInputs,
   activeProfileFees: ProfileFees,
 ): SmartMarkupResults {
   const costBase = inputs.productCost + inputs.shipping;

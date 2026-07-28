@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { CalculatorProvider, useCalculatorContext } from '@/context/CalculatorContext';
+import { CurrencyProvider } from '@/context/CurrencyContext';
 import { AppShell } from '@/components/layout/AppShell';
+import { Spinner } from '@/components/ui/Spinner';
 import { CalculatorPage } from '@/pages/CalculatorPage';
 import { SimulatorPage } from '@/pages/SimulatorPage';
 import { SmartMarkupPage } from '@/pages/SmartMarkupPage';
@@ -18,7 +20,7 @@ function AppContent() {
   if (!isLoaded) {
     return (
       <div className="flex h-[700px] w-[420px] items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <Spinner />
       </div>
     );
   }
@@ -34,8 +36,10 @@ function AppContent() {
 
 export function App() {
   return (
-    <CalculatorProvider>
-      <AppContent />
-    </CalculatorProvider>
+    <CurrencyProvider>
+      <CalculatorProvider>
+        <AppContent />
+      </CalculatorProvider>
+    </CurrencyProvider>
   );
 }

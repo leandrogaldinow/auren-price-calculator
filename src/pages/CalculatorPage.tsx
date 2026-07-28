@@ -1,4 +1,5 @@
 import { useCalculatorContext } from '@/context/CalculatorContext';
+import { useCurrencyContext } from '@/context/CurrencyContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { ProfileSelector } from '@/components/calculator/ProfileSelector';
@@ -16,11 +17,15 @@ export function CalculatorPage() {
     activeProfile,
     productCost,
     shipping,
+    productCostCurrency,
+    shippingCurrency,
     draftFees,
     isDirty,
     results,
     setProductCost,
     setShipping,
+    setProductCostCurrency,
+    setShippingCurrency,
     setDraftFee,
     selectProfile,
     saveProfile,
@@ -31,12 +36,13 @@ export function CalculatorPage() {
     exportData,
     importData,
   } = useCalculatorContext();
+  const { baseCurrency } = useCurrencyContext();
   const { toast, showToast } = useToast();
 
   if (!activeProfile) return null;
 
   const handleCopy = async () => {
-    const ok = await copyToClipboard(buildResultsSummary(results, draftFees.markup));
+    const ok = await copyToClipboard(buildResultsSummary(results, draftFees.markup, baseCurrency));
     showToast(ok ? 'Resultados copiados!' : 'Não foi possível copiar.', ok ? 'success' : 'danger');
   };
 
@@ -72,14 +78,18 @@ export function CalculatorPage() {
         productCost={productCost}
         shipping={shipping}
         markup={draftFees.markup}
+        productCostCurrency={productCostCurrency}
+        shippingCurrency={shippingCurrency}
         onProductCostChange={setProductCost}
         onShippingChange={setShipping}
         onMarkupChange={(value) => setDraftFee('markup', value)}
+        onProductCostCurrencyChange={setProductCostCurrency}
+        onShippingCurrencyChange={setShippingCurrency}
       />
 
       <FeesForm fees={draftFees} onChange={setDraftFee} />
 
-      <ResultsSummary results={results} />
+      <ResultsSummary results={results} currency={baseCurrency} />
 
       <ResultsActions onCopy={handleCopy} onExport={exportData} onImport={handleImport} />
 

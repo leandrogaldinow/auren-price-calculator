@@ -3,7 +3,7 @@ import { formatNumber } from '@/utils/format';
 import { parseLocaleNumber, sanitizeNumericInput } from '@/utils/numberInput';
 
 interface NumberFieldProps {
-  label: string;
+  label?: string;
   value: number;
   onChange: (value: number) => void;
   prefix?: string;
@@ -37,7 +37,7 @@ export function NumberField({
 
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
+      {label && <span className="text-xs font-medium text-text-secondary">{label}</span>}
       <div className="flex items-center rounded-lg border border-border bg-background px-3 transition-colors duration-150 focus-within:border-primary">
         {prefix && <span className="mr-1.5 text-sm text-text-secondary">{prefix}</span>}
         <input

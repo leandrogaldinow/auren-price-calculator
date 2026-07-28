@@ -1,8 +1,12 @@
+import type { CurrencyCode } from './currency';
+
 export interface SimulatorInputs {
   /** Daily ad budget. */
   dailyInvestment: number;
   cpa: number;
   days: number;
+  dailyInvestmentCurrency: CurrencyCode;
+  cpaCurrency: CurrencyCode;
 }
 
 export interface SimulatorResults {

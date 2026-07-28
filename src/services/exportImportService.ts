@@ -1,5 +1,10 @@
-import type { AurenStorageSchema, Profile } from '@/types';
+import type { AurenStorageSchema, CurrencyCode, Profile } from '@/types';
 import { STORAGE_VERSION } from '@/constants/storageKeys';
+import { CURRENCIES, DEFAULT_CURRENCY } from '@/constants/currencies';
+
+function isValidCurrency(value: unknown): value is CurrencyCode {
+  return typeof value === 'string' && CURRENCIES.some((c) => c.code === value);
+}
 
 function isValidProfile(value: unknown): value is Profile {
   if (typeof value !== 'object' || value === null) return false;
@@ -64,6 +69,12 @@ export async function parseImportedFile(file: File): Promise<AurenStorageSchema>
     activeProfileId,
     lastProductCost: typeof data.lastProductCost === 'number' ? data.lastProductCost : 0,
     lastShipping: typeof data.lastShipping === 'number' ? data.lastShipping : 0,
+    lastProductCostCurrency: isValidCurrency(data.lastProductCostCurrency)
+      ? data.lastProductCostCurrency
+      : DEFAULT_CURRENCY,
+    lastShippingCurrency: isValidCurrency(data.lastShippingCurrency)
+      ? data.lastShippingCurrency
+      : DEFAULT_CURRENCY,
     version: STORAGE_VERSION,
   };
 }

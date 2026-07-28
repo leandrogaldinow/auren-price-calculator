@@ -1,5 +1,5 @@
 import { Card, CardTitle } from '@/components/ui/Card';
-import { NumberField } from '@/components/ui/NumberField';
+import { MoneyField } from '@/components/ui/MoneyField';
 import { PercentField } from '@/components/ui/PercentField';
 import type { SmartMarkupInputs } from '@/types';
 
@@ -12,17 +12,27 @@ export function SmartMarkupForm({ inputs, onChange }: SmartMarkupFormProps) {
   return (
     <Card className="animate-fadeIn">
       <CardTitle className="mb-3">Metas de Precificação</CardTitle>
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField
+      <div className="flex flex-col gap-3">
+        <MoneyField
           label="Produto"
-          value={inputs.productCost}
-          onChange={(value) => onChange('productCost', value)}
+          amount={inputs.productCost}
+          currency={inputs.productCostCurrency}
+          onAmountChange={(value) => onChange('productCost', value)}
+          onCurrencyChange={(currency) => onChange('productCostCurrency', currency)}
         />
-        <NumberField label="Frete" value={inputs.shipping} onChange={(value) => onChange('shipping', value)} />
-        <NumberField
+        <MoneyField
+          label="Frete"
+          amount={inputs.shipping}
+          currency={inputs.shippingCurrency}
+          onAmountChange={(value) => onChange('shipping', value)}
+          onCurrencyChange={(currency) => onChange('shippingCurrency', currency)}
+        />
+        <MoneyField
           label="Lucro Desejado"
-          value={inputs.desiredProfit}
-          onChange={(value) => onChange('desiredProfit', value)}
+          amount={inputs.desiredProfit}
+          currency={inputs.desiredProfitCurrency}
+          onAmountChange={(value) => onChange('desiredProfit', value)}
+          onCurrencyChange={(currency) => onChange('desiredProfitCurrency', currency)}
         />
         <PercentField
           label="Margem Desejada"

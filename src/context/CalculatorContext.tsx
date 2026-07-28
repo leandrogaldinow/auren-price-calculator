@@ -11,6 +11,7 @@ import type {
   AurenStorageSchema,
   CalculatorInputs,
   CalculatorResults,
+  CurrencyCode,
   Profile,
   ProfileFees,
 } from '@/types';
@@ -23,6 +24,8 @@ import {
 } from '@/services/profileService';
 import { calculatePricing } from '@/utils/calculations/pricingCalculator';
 import { exportStateToFile, parseImportedFile } from '@/services/exportImportService';
+import { useCurrencyContext } from '@/context/CurrencyContext';
+import { DEFAULT_CURRENCY } from '@/constants/currencies';
 
 interface CalculatorContextValue {
   isLoaded: boolean;
@@ -30,12 +33,16 @@ interface CalculatorContextValue {
   activeProfile: Profile | undefined;
   productCost: number;
   shipping: number;
+  productCostCurrency: CurrencyCode;
+  shippingCurrency: CurrencyCode;
   draftFees: ProfileFees;
   isDirty: boolean;
   inputs: CalculatorInputs;
   results: CalculatorResults;
   setProductCost: (value: number) => void;
   setShipping: (value: number) => void;
+  setProductCostCurrency: (currency: CurrencyCode) => void;
+  setShippingCurrency: (currency: CurrencyCode) => void;
   setDraftFee: <K extends keyof ProfileFees>(field: K, value: ProfileFees[K]) => void;
   selectProfile: (id: string) => void;
   saveProfile: () => void;
@@ -81,6 +88,9 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
   const [activeProfileId, setActiveProfileId] = useState('');
   const [productCost, setProductCostState] = useState(0);
   const [shipping, setShippingState] = useState(0);
+  const [productCostCurrency, setProductCostCurrencyState] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const [shippingCurrency, setShippingCurrencyState] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const { baseCurrency, convert } = useCurrencyContext();
   const [draftFees, setDraftFees] = useState<ProfileFees>({
     markup: 2.5,
     gatewayPercent: 0,
@@ -97,6 +107,8 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
       setActiveProfileId(state.activeProfileId);
       setProductCostState(state.lastProductCost);
       setShippingState(state.lastShipping);
+      setProductCostCurrencyState(state.lastProductCostCurrency ?? DEFAULT_CURRENCY);
+      setShippingCurrencyState(state.lastShippingCurrency ?? DEFAULT_CURRENCY);
       const active = state.profiles.find((p) => p.id === state.activeProfileId);
       if (active) setDraftFees(extractFees(active));
       setIsLoaded(true);
@@ -110,19 +122,26 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
         activeProfileId: next.activeProfileId ?? activeProfileId,
         lastProductCost: next.lastProductCost ?? productCost,
         lastShipping: next.lastShipping ?? shipping,
+        lastProductCostCurrency: next.lastProductCostCurrency ?? productCostCurrency,
+        lastShippingCurrency: next.lastShippingCurrency ?? shippingCurrency,
         version: 1,
       };
       void saveState(nextState);
     },
-    [profiles, activeProfileId, productCost, shipping],
+    [profiles, activeProfileId, productCost, shipping, productCostCurrency, shippingCurrency],
   );
 
   // Persist product/shipping immediately — they live outside any profile.
   useEffect(() => {
     if (!isLoaded) return;
-    persist({ lastProductCost: productCost, lastShipping: shipping });
+    persist({
+      lastProductCost: productCost,
+      lastShipping: shipping,
+      lastProductCostCurrency: productCostCurrency,
+      lastShippingCurrency: shippingCurrency,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productCost, shipping, isLoaded]);
+  }, [productCost, shipping, productCostCurrency, shippingCurrency, isLoaded]);
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId),
@@ -135,8 +154,12 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
   );
 
   const inputs: CalculatorInputs = useMemo(
-    () => ({ productCost, shipping, ...draftFees }),
-    [productCost, shipping, draftFees],
+    () => ({
+      productCost: convert(productCost, productCostCurrency, baseCurrency),
+      shipping: convert(shipping, shippingCurrency, baseCurrency),
+      ...draftFees,
+    }),
+    [productCost, productCostCurrency, shipping, shippingCurrency, baseCurrency, convert, draftFees],
   );
 
   const results = useMemo(() => calculatePricing(inputs), [inputs]);
@@ -147,6 +170,14 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const setProductCostCurrency = useCallback((currency: CurrencyCode) => {
+    setProductCostCurrencyState(currency);
+  }, []);
+
+  const setShippingCurrency = useCallback((currency: CurrencyCode) => {
+    setShippingCurrencyState(currency);
+  }, []);
 
   const selectProfile = useCallback(
     (id: string) => {
@@ -216,9 +247,11 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
       activeProfileId,
       lastProductCost: productCost,
       lastShipping: shipping,
+      lastProductCostCurrency: productCostCurrency,
+      lastShippingCurrency: shippingCurrency,
       version: 1,
     });
-  }, [profiles, activeProfileId, productCost, shipping]);
+  }, [profiles, activeProfileId, productCost, shipping, productCostCurrency, shippingCurrency]);
 
   const importData = useCallback(async (file: File) => {
     const imported = await parseImportedFile(file);
@@ -226,6 +259,8 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     setActiveProfileId(imported.activeProfileId);
     setProductCostState(imported.lastProductCost);
     setShippingState(imported.lastShipping);
+    setProductCostCurrencyState(imported.lastProductCostCurrency ?? DEFAULT_CURRENCY);
+    setShippingCurrencyState(imported.lastShippingCurrency ?? DEFAULT_CURRENCY);
     const active = imported.profiles.find((p) => p.id === imported.activeProfileId);
     if (active) setDraftFees(extractFees(active));
     await saveState(imported);
@@ -237,12 +272,16 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     activeProfile,
     productCost,
     shipping,
+    productCostCurrency,
+    shippingCurrency,
     draftFees,
     isDirty,
     inputs,
     results,
     setProductCost: setProductCostState,
     setShipping: setShippingState,
+    setProductCostCurrency,
+    setShippingCurrency,
     setDraftFee,
     selectProfile,
     saveProfile,

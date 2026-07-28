@@ -6,6 +6,9 @@ export type SimulatorPricingContext = Pick<
   'sellingPrice' | 'profitBeforeMarketing'
 >;
 
+/** Numeric inputs only, already converted to the base currency by the caller. */
+export type SimulatorCalculationInputs = Pick<SimulatorInputs, 'dailyInvestment' | 'cpa' | 'days'>;
+
 /**
  * Projects a paid-traffic campaign using the selling price and per-unit costs
  * already computed on the Calculator tab — ad spend here comes from real CPA
@@ -13,7 +16,7 @@ export type SimulatorPricingContext = Pick<
  * from the per-unit cost base (profitBeforeMarketing already adds it back).
  */
 export function calculateSimulation(
-  inputs: SimulatorInputs,
+  inputs: SimulatorCalculationInputs,
   pricing: SimulatorPricingContext,
 ): SimulatorResults {
   const totalInvestment = inputs.dailyInvestment * inputs.days;

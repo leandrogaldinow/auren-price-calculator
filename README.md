@@ -53,11 +53,12 @@ Sempre que alterar o código, rode `npm run build` de novo e clique no botão de
 
 ```
 src/
-  types/         Tipos TypeScript compartilhados (Profile, CalculatorInputs/Results, Simulator, SmartMarkup, Storage)
-  constants/     Perfis padrão (Brasil/México/EUA/Europa), faixas de margem, chaves de storage
+  types/         Tipos TypeScript compartilhados (Profile, CalculatorInputs/Results, Simulator, SmartMarkup, Storage, Currency)
+  constants/     Perfis padrão (Brasil/México/EUA/Europa), faixas de margem, chaves de storage, moedas suportadas
   utils/
     calculations/  Motores de cálculo puros (pricingCalculator, simulatorCalculator, smartMarkupCalculator)
-    format.ts      Formatação de moeda/percentual/multiplicador (pt-BR, vírgula decimal)
+    format.ts      Formatação de moeda/percentual/multiplicador/data (pt-BR, vírgula decimal)
+    currency.ts    Conversão entre moedas, símbolo e locale de cada moeda
     numberInput.ts Sanitização de digitação (bloqueia letras, aceita vírgula/ponto)
     clamp.ts       Clamp de percentuais 0–100
   storage/       Wrapper sobre chrome.storage.local (com fallback localStorage) + load/save do estado
@@ -65,21 +66,25 @@ src/
     profileService.ts       CRUD de perfis (criar, duplicar, resetar, aplicar taxas)
     exportImportService.ts  Exportar/Importar JSON com validação de schema
     clipboardService.ts     Copiar resultados formatados para a área de transferência
+    ExchangeRateService.ts  Busca e cacheia a cotação (AwesomeAPI) — único módulo que fala com a API
     scrapers/                Interfaces + stubs para captura futura de preços (AliExpress, CJ, 1688, Amazon)
-    currency/                 Stub de conversão de moeda (USD/CNY/EUR → BRL, BRL → MXN)
-  context/       CalculatorContext — fonte única de verdade (perfis, custos, taxas, resultados calculados)
+    currency/                 Stub legado (não usado) de conversão para os scrapers — não confundir com ExchangeRateService.ts
+  context/
+    CalculatorContext.tsx  Fonte única de verdade da Calculadora (perfis, custos, taxas, resultados calculados)
+    CurrencyContext.tsx    Moeda base, cotações em cache e função de conversão, compartilhados por todas as abas
   hooks/         useSimulator, useSmartMarkup, useToast
   components/
-    ui/           Primitivos reutilizáveis (Button, Card, NumberField, PercentField, Select, Tabs, Badge, Toast...)
+    ui/           Primitivos reutilizáveis (Button, Card, NumberField, MoneyField, PercentField, Select, Tabs, Badge, Toast, Spinner...)
     icons/         Ícones SVG inline (sem dependência externa)
-    layout/        AppShell, Header
+    layout/        AppShell, Header, BaseCurrencySelector (seletor de "Moeda Base")
+    currency/      ExchangeRateCard — painel "Cotação" (taxas, última atualização, botão Atualizar)
     calculator/    Formulários e painel de resultados da aba Calculadora
     simulator/     Formulário e resultados da aba Simulador
     smartMarkup/   Formulário e resultados da aba Markup Inteligente
   pages/         Uma página por aba (CalculatorPage, SimulatorPage, SmartMarkupPage)
-  App.tsx        Composição das abas + CalculatorProvider
+  App.tsx        Composição das abas + CurrencyProvider + CalculatorProvider
   main.tsx       Entry point (React root + fontes)
-manifest.json    Manifest V3 (popup + ícones + permissão "storage")
+manifest.json    Manifest V3 (popup + ícones + permissão "storage" + host_permission da AwesomeAPI)
 scripts/generate-icons.mjs  Gera os PNGs do ícone (pngjs, sem dependência nativa)
 ```
 
@@ -90,7 +95,7 @@ scripts/generate-icons.mjs  Gera os PNGs do ícone (pngjs, sem dependência nati
 - **Novo campo de custo/taxa**: adicione o campo em [src/types/calculator.ts](src/types/calculator.ts) (`CalculatorInputs`), inclua a fórmula em [src/utils/calculations/pricingCalculator.ts](src/utils/calculations/pricingCalculator.ts), e adicione o campo em [src/components/calculator/FeesForm.tsx](src/components/calculator/FeesForm.tsx) (ou `CostForm.tsx`). Se for um percentual editável por perfil, inclua também em `ProfileFees` ([src/types/profile.ts](src/types/profile.ts)) e nos presets em [src/constants/defaultProfiles.ts](src/constants/defaultProfiles.ts).
 - **Nova aba**: crie a página em `src/pages/`, o(s) componente(s) em `src/components/<nome-da-aba>/`, registre a aba em `TABS` e no switch de conteúdo em [src/App.tsx](src/App.tsx).
 - **Captura automática de preços (AliExpress, CJ Dropshipping, 1688, Amazon)**: as interfaces já existem em [src/services/scrapers/](src/services/scrapers/) (`ProductScraper`, `ScrapedProduct`). Para ativar: (1) implemente `scrape(document)` no scraper correspondente lendo o DOM/JSON da página, (2) registre um `content_scripts` no `manifest.json` apontando para o domínio do marketplace, (3) crie um content script que roda `findScraperForUrl(location.href)?.scrape(document)` e envia o resultado ao popup via `chrome.runtime.sendMessage`. Nenhuma mudança é necessária no motor de cálculo — o resultado do scraper alimenta os mesmos campos `productCost`/`shipping` do `CalculatorContext`.
-- **Conversão de moeda (USD/CNY/EUR → BRL, BRL → MXN)**: o stub em [src/services/currency/currencyService.ts](src/services/currency/currencyService.ts) já expõe `convertAmount`/`getConversionRate` com taxas fixas de fallback. Troque `FALLBACK_RATES` por uma chamada de API real (ex. exchangerate.host) com cache em `chrome.storage.local` — nenhum outro arquivo precisa mudar, pois o resto do app já consome essas funções pela assinatura pública.
+- **Multi-moeda (BRL/USD/MXN)**: ver seção [Câmbio de Moedas](#câmbio-de-moedas) abaixo.
 - **Histórico de cálculos / comparação de cenários / dashboard**: adicione um novo slice de estado em `AurenStorageSchema` ([src/types/storage.ts](src/types/storage.ts)), persista via `saveState`/`loadState` ([src/storage/profileStorage.ts](src/storage/profileStorage.ts)), e crie uma nova aba seguindo o padrão de "Nova aba" acima.
 - **Sincronização entre dispositivos**: troque `chrome.storage.local` por `chrome.storage.sync` em [src/storage/chromeStorage.ts](src/storage/chromeStorage.ts) (respeitando o limite de ~100KB do `sync`) — nenhum outro arquivo depende da API do Chrome diretamente.
 
@@ -121,6 +126,33 @@ Brasil, México, Estados Unidos e Europa vêm pré-configurados com taxas de gat
 - **Excluir Perfil**: remove o perfil ativo (pede confirmação inline; bloqueado se for o único perfil restante).
 - **Resetar**: restaura as taxas do perfil para o preset original (perfis Brasil/México/EUA/Europa) ou para zero (perfis customizados).
 
+## Câmbio de Moedas
+
+Cada campo monetário (Produto, Frete, Investimento, CPA, Lucro Desejado) tem seu próprio seletor de moeda (BRL/USD/MXN). A **Moeda Base**, selecionada na barra fixa no topo da extensão, define em que moeda todos os resultados (Calculadora, Simulador, Markup Inteligente) são exibidos — qualquer campo numa moeda diferente é convertido automaticamente antes do cálculo.
+
+### Como funciona o cache
+
+[src/services/ExchangeRateService.ts](src/services/ExchangeRateService.ts) é o único lugar que fala com a API de cotação. Ele busca os pares `USD-BRL`, `MXN-BRL` e `USD-MXN` na [AwesomeAPI](https://economia.awesomeapi.com.br/) (gratuita) e grava o resultado em `chrome.storage.local` sob a chave `auren_exchange_rate_cache`, no formato `{ exchangeRates, lastUpdate }`.
+
+- **Ao abrir a extensão**: se não existe cache, busca da API; se existe e tem menos de 30 minutos, usa o cache; se passou de 30 minutos, busca uma cotação nova automaticamente.
+- **Se a API falhar**: continua usando o último cache salvo, sem interromper o app.
+- **Se nunca houve cache e a API falha**: o card "Cotação" mostra "Não foi possível atualizar as cotações." com um botão para tentar novamente.
+- Nenhum componente React faz `fetch` diretamente — tudo passa por `getExchangeRates()`.
+
+### Como atualizar a cotação
+
+O botão **Atualizar Cotação** (no card "Cotação", sempre visível acima das abas) chama `getExchangeRates({ force: true })`, ignorando o TTL de 30 minutos e buscando um valor novo na hora. Os campos do formulário nunca disparam uma busca — só a abertura da extensão e esse botão.
+
+### Como adicionar uma moeda nova
+
+1. Adicione um item em `CURRENCIES` em [src/constants/currencies.ts](src/constants/currencies.ts) (`code`, `label`, `flag`, `locale`).
+2. Adicione o par da moeda nova contra BRL na URL da AwesomeAPI em `ExchangeRateService.ts` (ex. `,EUR-BRL`) — a conversão entre quaisquer moedas usa BRL como pivô ([src/utils/currency.ts](src/utils/currency.ts)), então um novo par contra BRL já habilita conversão com todas as moedas existentes.
+3. Pronto — `MoneyField`, `formatCurrency` e o card "Cotação" já leem de `CURRENCIES` dinamicamente, nenhum outro arquivo precisa mudar.
+
+### Como trocar de API no futuro
+
+Troque a implementação de `fetchExchangeRates()` em [src/services/ExchangeRateService.ts](src/services/ExchangeRateService.ts) — é o único módulo que conhece o formato de resposta da AwesomeAPI. Basta continuar devolvendo um `ExchangeCache` (`{ exchangeRates: ExchangeRate[], lastUpdate }`) que nada mais no app precisa mudar.
+
 ## Armazenamento
 
-Todo o estado (perfis, perfil ativo, último produto/frete usados) é salvo automaticamente em `chrome.storage.local` a cada alteração — não há botão "salvar estado global" porque isso já acontece em tempo real. O botão **Salvar Perfil** é especificamente sobre gravar as edições de taxas no perfil selecionado.
+Todo o estado (perfis, perfil ativo, último produto/frete usados e suas moedas) é salvo automaticamente em `chrome.storage.local` a cada alteração — não há botão "salvar estado global" porque isso já acontece em tempo real. O botão **Salvar Perfil** é especificamente sobre gravar as edições de taxas no perfil selecionado. A Moeda Base e o cache de cotação são salvos separadamente, sob as chaves `auren_currency_settings` e `auren_exchange_rate_cache`.
