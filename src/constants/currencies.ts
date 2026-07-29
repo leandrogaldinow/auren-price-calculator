@@ -11,3 +11,6 @@ export const CURRENCIES: CurrencyConfig[] = [
 ];
 
 export const DEFAULT_CURRENCY: CurrencyCode = 'BRL';
+
+/** Cost fields (Produto, Frete, Taxa Fixa do Gateway) default to USD on first-ever install. */
+export const DEFAULT_COST_CURRENCY: CurrencyCode = 'USD';

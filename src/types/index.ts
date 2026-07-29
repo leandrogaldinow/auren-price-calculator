@@ -4,3 +4,6 @@ export * from './simulator';
 export * from './smartMarkup';
 export * from './storage';
 export * from './currency';
+export * from './costSettings';
+export * from './uiPrefs';
+export * from './costRegistry';

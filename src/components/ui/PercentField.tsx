@@ -1,10 +1,10 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
 import { formatNumber } from '@/utils/format';
 import { parseLocaleNumber, sanitizeNumericInput } from '@/utils/numberInput';
 import { clampPercent } from '@/utils/clamp';
 
 interface PercentFieldProps {
-  label: string;
+  label: ReactNode;
   value: number;
   onChange: (value: number) => void;
 }

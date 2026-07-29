@@ -14,6 +14,8 @@ const REGION_PRESETS: Record<Exclude<RegionKey, 'custom'>, { name: string } & Om
     taxPercent: 6.0,
     marketingPercent: 15.0,
     extraPercent: 2.0,
+    fxConversionPercent: 0,
+    reservePercent: 0,
   },
   mexico: {
     name: 'México',
@@ -24,6 +26,8 @@ const REGION_PRESETS: Record<Exclude<RegionKey, 'custom'>, { name: string } & Om
     taxPercent: 4.0,
     marketingPercent: 15.0,
     extraPercent: 2.0,
+    fxConversionPercent: 0,
+    reservePercent: 0,
   },
   eua: {
     name: 'Estados Unidos',
@@ -34,6 +38,8 @@ const REGION_PRESETS: Record<Exclude<RegionKey, 'custom'>, { name: string } & Om
     taxPercent: 0,
     marketingPercent: 18.0,
     extraPercent: 2.0,
+    fxConversionPercent: 0,
+    reservePercent: 0,
   },
   europa: {
     name: 'Europa',
@@ -44,6 +50,8 @@ const REGION_PRESETS: Record<Exclude<RegionKey, 'custom'>, { name: string } & Om
     taxPercent: 0,
     marketingPercent: 18.0,
     extraPercent: 2.0,
+    fxConversionPercent: 0,
+    reservePercent: 0,
   },
 };
 
@@ -62,6 +70,8 @@ export function createDefaultProfiles(): Profile[] {
       taxPercent: preset.taxPercent,
       marketingPercent: preset.marketingPercent,
       extraPercent: preset.extraPercent,
+      fxConversionPercent: preset.fxConversionPercent,
+      reservePercent: preset.reservePercent,
       createdAt: now,
       updatedAt: now,
     };

@@ -7,14 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type {
-  AurenStorageSchema,
-  CalculatorInputs,
-  CalculatorResults,
-  CurrencyCode,
-  Profile,
-  ProfileFees,
-} from '@/types';
+import type { AurenStorageSchema, CalculatorInputs, CalculatorResults, CurrencyCode, Profile, ProfileFees } from '@/types';
 import { loadState, saveState } from '@/storage/profileStorage';
 import {
   applyProfileFees,
@@ -22,10 +15,12 @@ import {
   buildNewProfile,
   resetProfileFees,
 } from '@/services/profileService';
+import { applyCostSettingsMask } from '@/services/costSettingsService';
 import { calculatePricing } from '@/utils/calculations/pricingCalculator';
 import { exportStateToFile, parseImportedFile } from '@/services/exportImportService';
 import { useCurrencyContext } from '@/context/CurrencyContext';
-import { DEFAULT_CURRENCY } from '@/constants/currencies';
+import { useCostSettingsContext } from '@/context/CostSettingsContext';
+import { DEFAULT_COST_CURRENCY } from '@/constants/currencies';
 
 interface CalculatorContextValue {
   isLoaded: boolean;
@@ -35,6 +30,8 @@ interface CalculatorContextValue {
   shipping: number;
   productCostCurrency: CurrencyCode;
   shippingCurrency: CurrencyCode;
+  gatewayFixedFee: number;
+  gatewayFixedFeeCurrency: CurrencyCode;
   draftFees: ProfileFees;
   isDirty: boolean;
   inputs: CalculatorInputs;
@@ -43,6 +40,8 @@ interface CalculatorContextValue {
   setShipping: (value: number) => void;
   setProductCostCurrency: (currency: CurrencyCode) => void;
   setShippingCurrency: (currency: CurrencyCode) => void;
+  setGatewayFixedFee: (value: number) => void;
+  setGatewayFixedFeeCurrency: (currency: CurrencyCode) => void;
   setDraftFee: <K extends keyof ProfileFees>(field: K, value: ProfileFees[K]) => void;
   selectProfile: (id: string) => void;
   saveProfile: () => void;
@@ -64,6 +63,8 @@ const FEE_KEYS: (keyof ProfileFees)[] = [
   'taxPercent',
   'marketingPercent',
   'extraPercent',
+  'fxConversionPercent',
+  'reservePercent',
 ];
 
 function extractFees(profile: Profile): ProfileFees {
@@ -75,6 +76,8 @@ function extractFees(profile: Profile): ProfileFees {
     taxPercent: profile.taxPercent,
     marketingPercent: profile.marketingPercent,
     extraPercent: profile.extraPercent,
+    fxConversionPercent: profile.fxConversionPercent,
+    reservePercent: profile.reservePercent,
   };
 }
 
@@ -88,9 +91,13 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
   const [activeProfileId, setActiveProfileId] = useState('');
   const [productCost, setProductCostState] = useState(0);
   const [shipping, setShippingState] = useState(0);
-  const [productCostCurrency, setProductCostCurrencyState] = useState<CurrencyCode>(DEFAULT_CURRENCY);
-  const [shippingCurrency, setShippingCurrencyState] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const [productCostCurrency, setProductCostCurrencyState] = useState<CurrencyCode>(DEFAULT_COST_CURRENCY);
+  const [shippingCurrency, setShippingCurrencyState] = useState<CurrencyCode>(DEFAULT_COST_CURRENCY);
+  const [gatewayFixedFee, setGatewayFixedFeeState] = useState(0);
+  const [gatewayFixedFeeCurrency, setGatewayFixedFeeCurrencyState] =
+    useState<CurrencyCode>(DEFAULT_COST_CURRENCY);
   const { baseCurrency, convert } = useCurrencyContext();
+  const { costSettings } = useCostSettingsContext();
   const [draftFees, setDraftFees] = useState<ProfileFees>({
     markup: 2.5,
     gatewayPercent: 0,
@@ -99,6 +106,8 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     taxPercent: 0,
     marketingPercent: 0,
     extraPercent: 0,
+    fxConversionPercent: 0,
+    reservePercent: 0,
   });
 
   useEffect(() => {
@@ -107,8 +116,10 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
       setActiveProfileId(state.activeProfileId);
       setProductCostState(state.lastProductCost);
       setShippingState(state.lastShipping);
-      setProductCostCurrencyState(state.lastProductCostCurrency ?? DEFAULT_CURRENCY);
-      setShippingCurrencyState(state.lastShippingCurrency ?? DEFAULT_CURRENCY);
+      setProductCostCurrencyState(state.lastProductCostCurrency ?? DEFAULT_COST_CURRENCY);
+      setShippingCurrencyState(state.lastShippingCurrency ?? DEFAULT_COST_CURRENCY);
+      setGatewayFixedFeeState(state.lastGatewayFixedFee ?? 0);
+      setGatewayFixedFeeCurrencyState(state.lastGatewayFixedFeeCurrency ?? DEFAULT_COST_CURRENCY);
       const active = state.profiles.find((p) => p.id === state.activeProfileId);
       if (active) setDraftFees(extractFees(active));
       setIsLoaded(true);
@@ -124,14 +135,25 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
         lastShipping: next.lastShipping ?? shipping,
         lastProductCostCurrency: next.lastProductCostCurrency ?? productCostCurrency,
         lastShippingCurrency: next.lastShippingCurrency ?? shippingCurrency,
+        lastGatewayFixedFee: next.lastGatewayFixedFee ?? gatewayFixedFee,
+        lastGatewayFixedFeeCurrency: next.lastGatewayFixedFeeCurrency ?? gatewayFixedFeeCurrency,
         version: 1,
       };
       void saveState(nextState);
     },
-    [profiles, activeProfileId, productCost, shipping, productCostCurrency, shippingCurrency],
+    [
+      profiles,
+      activeProfileId,
+      productCost,
+      shipping,
+      productCostCurrency,
+      shippingCurrency,
+      gatewayFixedFee,
+      gatewayFixedFeeCurrency,
+    ],
   );
 
-  // Persist product/shipping immediately — they live outside any profile.
+  // Persist product/shipping/gateway-fixed-fee immediately — they live outside any profile.
   useEffect(() => {
     if (!isLoaded) return;
     persist({
@@ -139,9 +161,19 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
       lastShipping: shipping,
       lastProductCostCurrency: productCostCurrency,
       lastShippingCurrency: shippingCurrency,
+      lastGatewayFixedFee: gatewayFixedFee,
+      lastGatewayFixedFeeCurrency: gatewayFixedFeeCurrency,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productCost, shipping, productCostCurrency, shippingCurrency, isLoaded]);
+  }, [
+    productCost,
+    shipping,
+    productCostCurrency,
+    shippingCurrency,
+    gatewayFixedFee,
+    gatewayFixedFeeCurrency,
+    isLoaded,
+  ]);
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId),
@@ -154,12 +186,28 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
   );
 
   const inputs: CalculatorInputs = useMemo(
-    () => ({
-      productCost: convert(productCost, productCostCurrency, baseCurrency),
-      shipping: convert(shipping, shippingCurrency, baseCurrency),
-      ...draftFees,
-    }),
-    [productCost, productCostCurrency, shipping, shippingCurrency, baseCurrency, convert, draftFees],
+    () =>
+      applyCostSettingsMask(
+        {
+          productCost: convert(productCost, productCostCurrency, baseCurrency),
+          shipping: convert(shipping, shippingCurrency, baseCurrency),
+          gatewayFixedFee: convert(gatewayFixedFee, gatewayFixedFeeCurrency, baseCurrency),
+          ...draftFees,
+        },
+        costSettings,
+      ),
+    [
+      productCost,
+      productCostCurrency,
+      shipping,
+      shippingCurrency,
+      gatewayFixedFee,
+      gatewayFixedFeeCurrency,
+      baseCurrency,
+      convert,
+      draftFees,
+      costSettings,
+    ],
   );
 
   const results = useMemo(() => calculatePricing(inputs), [inputs]);
@@ -177,6 +225,14 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
 
   const setShippingCurrency = useCallback((currency: CurrencyCode) => {
     setShippingCurrencyState(currency);
+  }, []);
+
+  const setGatewayFixedFee = useCallback((value: number) => {
+    setGatewayFixedFeeState(value);
+  }, []);
+
+  const setGatewayFixedFeeCurrency = useCallback((currency: CurrencyCode) => {
+    setGatewayFixedFeeCurrencyState(currency);
   }, []);
 
   const selectProfile = useCallback(
@@ -249,9 +305,20 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
       lastShipping: shipping,
       lastProductCostCurrency: productCostCurrency,
       lastShippingCurrency: shippingCurrency,
+      lastGatewayFixedFee: gatewayFixedFee,
+      lastGatewayFixedFeeCurrency: gatewayFixedFeeCurrency,
       version: 1,
     });
-  }, [profiles, activeProfileId, productCost, shipping, productCostCurrency, shippingCurrency]);
+  }, [
+    profiles,
+    activeProfileId,
+    productCost,
+    shipping,
+    productCostCurrency,
+    shippingCurrency,
+    gatewayFixedFee,
+    gatewayFixedFeeCurrency,
+  ]);
 
   const importData = useCallback(async (file: File) => {
     const imported = await parseImportedFile(file);
@@ -259,8 +326,10 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     setActiveProfileId(imported.activeProfileId);
     setProductCostState(imported.lastProductCost);
     setShippingState(imported.lastShipping);
-    setProductCostCurrencyState(imported.lastProductCostCurrency ?? DEFAULT_CURRENCY);
-    setShippingCurrencyState(imported.lastShippingCurrency ?? DEFAULT_CURRENCY);
+    setProductCostCurrencyState(imported.lastProductCostCurrency ?? DEFAULT_COST_CURRENCY);
+    setShippingCurrencyState(imported.lastShippingCurrency ?? DEFAULT_COST_CURRENCY);
+    setGatewayFixedFeeState(imported.lastGatewayFixedFee ?? 0);
+    setGatewayFixedFeeCurrencyState(imported.lastGatewayFixedFeeCurrency ?? DEFAULT_COST_CURRENCY);
     const active = imported.profiles.find((p) => p.id === imported.activeProfileId);
     if (active) setDraftFees(extractFees(active));
     await saveState(imported);
@@ -274,6 +343,8 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     shipping,
     productCostCurrency,
     shippingCurrency,
+    gatewayFixedFee,
+    gatewayFixedFeeCurrency,
     draftFees,
     isDirty,
     inputs,
@@ -282,6 +353,8 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     setShipping: setShippingState,
     setProductCostCurrency,
     setShippingCurrency,
+    setGatewayFixedFee,
+    setGatewayFixedFeeCurrency,
     setDraftFee,
     selectProfile,
     saveProfile,

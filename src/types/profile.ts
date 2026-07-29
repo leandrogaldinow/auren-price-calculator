@@ -10,7 +10,12 @@ export interface Profile {
   iofPercent: number;
   taxPercent: number;
   marketingPercent: number;
+  /** Displayed as "Despesas Operacionais" in the UI. */
   extraPercent: number;
+  /** Displayed as "Conversão Cambial" in the UI. */
+  fxConversionPercent: number;
+  /** Reserve for chargebacks/refunds/losses. */
+  reservePercent: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -27,4 +32,6 @@ export type ProfileFees = Pick<
   | 'taxPercent'
   | 'marketingPercent'
   | 'extraPercent'
+  | 'fxConversionPercent'
+  | 'reservePercent'
 >;

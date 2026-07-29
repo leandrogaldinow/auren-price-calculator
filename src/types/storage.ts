@@ -11,6 +11,9 @@ export interface AurenStorageSchema {
   /** Optional for backward compat — state saved before multi-currency support won't have these. */
   lastProductCostCurrency?: CurrencyCode;
   lastShippingCurrency?: CurrencyCode;
+  /** Flat "Taxa Fixa do Gateway" fee — lives outside profiles, same reasoning as Produto/Frete. */
+  lastGatewayFixedFee?: number;
+  lastGatewayFixedFeeCurrency?: CurrencyCode;
   version: number;
 }
 

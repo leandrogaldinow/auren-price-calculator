@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { CurrencyCode } from '@/types';
 import { CURRENCIES } from '@/constants/currencies';
 import { NumberField } from './NumberField';
@@ -9,12 +10,14 @@ const CURRENCY_OPTIONS = CURRENCIES.map((currency) => ({
 }));
 
 interface MoneyFieldProps {
-  label: string;
+  label: ReactNode;
   amount: number;
   currency: CurrencyCode;
   onAmountChange: (value: number) => void;
   onCurrencyChange: (currency: CurrencyCode) => void;
   placeholder?: string;
+  /** Plain-text label for the currency select's aria-label, used when `label` isn't a string. */
+  ariaLabel?: string;
 }
 
 /** Monetary field: a currency selector paired with a numeric amount input. */
@@ -25,7 +28,9 @@ export function MoneyField({
   onAmountChange,
   onCurrencyChange,
   placeholder,
+  ariaLabel,
 }: MoneyFieldProps) {
+  const currencyLabel = ariaLabel ?? (typeof label === 'string' ? label : '');
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-medium text-text-secondary">{label}</span>
@@ -35,7 +40,7 @@ export function MoneyField({
             value={currency}
             onChange={(event) => onCurrencyChange(event.target.value as CurrencyCode)}
             options={CURRENCY_OPTIONS}
-            aria-label={`Moeda de ${label}`}
+            aria-label={`Moeda de ${currencyLabel}`}
           />
         </div>
         <div className="min-w-0 flex-1">

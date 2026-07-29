@@ -8,25 +8,31 @@ export function calculatePricing(inputs: CalculatorInputs): CalculatorResults {
   const sellingPrice = productPlusShipping * inputs.markup;
 
   const gatewayFee = sellingPrice * (inputs.gatewayPercent / 100);
+  const gatewayFixedFee = inputs.gatewayFixedFee;
   const checkoutFee = sellingPrice * (inputs.checkoutPercent / 100);
   const iofFee = sellingPrice * (inputs.iofPercent / 100);
   const taxFee = sellingPrice * (inputs.taxPercent / 100);
   const marketingFee = sellingPrice * (inputs.marketingPercent / 100);
   const extraFee = sellingPrice * (inputs.extraPercent / 100);
+  const fxConversionFee = sellingPrice * (inputs.fxConversionPercent / 100);
+  const reserveFee = sellingPrice * (inputs.reservePercent / 100);
 
-  const financialCosts = gatewayFee + checkoutFee + iofFee;
-  const totalFees = financialCosts + taxFee + marketingFee + extraFee;
+  const financialCosts = gatewayFee + gatewayFixedFee + checkoutFee + iofFee;
+  const totalFees = financialCosts + taxFee + marketingFee + extraFee + fxConversionFee + reserveFee;
 
   const netProfit =
     sellingPrice -
     inputs.productCost -
     inputs.shipping -
     gatewayFee -
+    gatewayFixedFee -
     checkoutFee -
     iofFee -
     taxFee -
     marketingFee -
-    extraFee;
+    extraFee -
+    fxConversionFee -
+    reserveFee;
 
   const profitBeforeMarketing = netProfit + marketingFee;
 
@@ -41,11 +47,14 @@ export function calculatePricing(inputs: CalculatorInputs): CalculatorResults {
     sellingPrice,
     productPlusShipping,
     gatewayFee,
+    gatewayFixedFee,
     checkoutFee,
     iofFee,
     taxFee,
     marketingFee,
     extraFee,
+    fxConversionFee,
+    reserveFee,
     financialCosts,
     totalFees,
     netProfit,

@@ -87,7 +87,7 @@ export function CalculatorPage() {
         onShippingCurrencyChange={setShippingCurrency}
       />
 
-      <FeesForm fees={draftFees} onChange={setDraftFee} />
+      <FeesForm />
 
       <ResultsSummary results={results} currency={baseCurrency} />
 

@@ -1,6 +1,6 @@
 import type { AurenStorageSchema, CurrencyCode, Profile } from '@/types';
 import { STORAGE_VERSION } from '@/constants/storageKeys';
-import { CURRENCIES, DEFAULT_CURRENCY } from '@/constants/currencies';
+import { CURRENCIES, DEFAULT_COST_CURRENCY } from '@/constants/currencies';
 
 function isValidCurrency(value: unknown): value is CurrencyCode {
   return typeof value === 'string' && CURRENCIES.some((c) => c.code === value);
@@ -21,6 +21,15 @@ function isValidProfile(value: unknown): value is Profile {
     typeof p.marketingPercent === 'number' &&
     typeof p.extraPercent === 'number'
   );
+}
+
+/** Fills in fxConversionPercent/reservePercent with 0 for files exported before these fields existed. */
+function withFeeDefaults(raw: Record<string, unknown>): Profile {
+  return {
+    ...(raw as unknown as Profile),
+    fxConversionPercent: typeof raw.fxConversionPercent === 'number' ? raw.fxConversionPercent : 0,
+    reservePercent: typeof raw.reservePercent === 'number' ? raw.reservePercent : 0,
+  };
 }
 
 export function exportStateToFile(state: AurenStorageSchema): void {
@@ -57,7 +66,7 @@ export async function parseImportedFile(file: File): Promise<AurenStorageSchema>
     throw new ImportValidationError('Perfis inválidos no arquivo importado.');
   }
 
-  const profiles = data.profiles as Profile[];
+  const profiles = (data.profiles as unknown as Record<string, unknown>[]).map(withFeeDefaults);
   const activeProfileId =
     typeof data.activeProfileId === 'string' &&
     profiles.some((p) => p.id === data.activeProfileId)
@@ -71,10 +80,14 @@ export async function parseImportedFile(file: File): Promise<AurenStorageSchema>
     lastShipping: typeof data.lastShipping === 'number' ? data.lastShipping : 0,
     lastProductCostCurrency: isValidCurrency(data.lastProductCostCurrency)
       ? data.lastProductCostCurrency
-      : DEFAULT_CURRENCY,
+      : DEFAULT_COST_CURRENCY,
     lastShippingCurrency: isValidCurrency(data.lastShippingCurrency)
       ? data.lastShippingCurrency
-      : DEFAULT_CURRENCY,
+      : DEFAULT_COST_CURRENCY,
+    lastGatewayFixedFee: typeof data.lastGatewayFixedFee === 'number' ? data.lastGatewayFixedFee : 0,
+    lastGatewayFixedFeeCurrency: isValidCurrency(data.lastGatewayFixedFeeCurrency)
+      ? data.lastGatewayFixedFeeCurrency
+      : DEFAULT_COST_CURRENCY,
     version: STORAGE_VERSION,
   };
 }

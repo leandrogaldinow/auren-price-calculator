@@ -1,16 +1,13 @@
 import type { Profile, ProfileFees } from '@/types';
 import { generateId } from '@/utils/id';
 import { createDefaultProfiles } from '@/constants/defaultProfiles';
+import { COST_REGISTRY } from '@/constants/costRegistry';
 
-const EMPTY_FEES: ProfileFees = {
-  markup: 2.5,
-  gatewayPercent: 0,
-  checkoutPercent: 0,
-  iofPercent: 0,
-  taxPercent: 0,
-  marketingPercent: 0,
-  extraPercent: 0,
-};
+const REGISTRY_PERCENT_DEFAULTS = Object.fromEntries(
+  COST_REGISTRY.filter((c) => c.type === 'percent').map((c) => [c.id, c.defaultValue]),
+) as Omit<ProfileFees, 'markup'>;
+
+const EMPTY_FEES: ProfileFees = { markup: 2.5, ...REGISTRY_PERCENT_DEFAULTS };
 
 export function buildNewProfile(name: string, fees: ProfileFees): Profile {
   const now = Date.now();

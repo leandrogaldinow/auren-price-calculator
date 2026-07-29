@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CalculatorProvider, useCalculatorContext } from '@/context/CalculatorContext';
 import { CurrencyProvider } from '@/context/CurrencyContext';
+import { CostSettingsProvider, useCostSettingsContext } from '@/context/CostSettingsContext';
 import { AppShell } from '@/components/layout/AppShell';
 import { Spinner } from '@/components/ui/Spinner';
 import { CalculatorPage } from '@/pages/CalculatorPage';
@@ -15,9 +16,10 @@ const TABS = [
 
 function AppContent() {
   const [activeTabId, setActiveTabId] = useState('calculator');
-  const { isLoaded } = useCalculatorContext();
+  const { isLoaded: calculatorLoaded } = useCalculatorContext();
+  const { isLoaded: costSettingsLoaded } = useCostSettingsContext();
 
-  if (!isLoaded) {
+  if (!calculatorLoaded || !costSettingsLoaded) {
     return (
       <div className="flex h-[700px] w-[420px] items-center justify-center bg-background">
         <Spinner />
@@ -37,9 +39,11 @@ function AppContent() {
 export function App() {
   return (
     <CurrencyProvider>
-      <CalculatorProvider>
-        <AppContent />
-      </CalculatorProvider>
+      <CostSettingsProvider>
+        <CalculatorProvider>
+          <AppContent />
+        </CalculatorProvider>
+      </CostSettingsProvider>
     </CurrencyProvider>
   );
 }
